@@ -1,7 +1,7 @@
-package com.getui.annotationsharedpreferences;
+package com.yurnero.annotationprefs;
 
 import com.yurnero.annotations.BooleanEntity;
-import com.yurnero.annotations.Definition;
+import com.yurnero.annotations.AnnotationPrefs;
 import com.yurnero.annotations.FloatEntity;
 import com.yurnero.annotations.IntEntity;
 import com.yurnero.annotations.LongEntity;
@@ -12,7 +12,7 @@ import com.yurnero.annotations.StringEntity;
  *
  * @author：qiangjie @version：17/7/4 上午12:17
  */
-@Definition(javaFileName = "MySharedPreferences1", spFileName = "mysp1")
+@AnnotationPrefs(javaFileName = "MySharedPreferences1")
 public class SharedPreferencesUtils1 {
     @StringEntity(key = "key_name", defaultValue = "hah")
     String KEY_NAME;

@@ -7,11 +7,6 @@ import java.lang.annotation.Annotation;
 
 import javax.lang.model.element.Modifier;
 
-/**
- * description:.
- *
- * @author：qiangjie @version：17/7/9 下午11:12
- */
 
 public class GetterMethod extends BaseMethod {
     private final static String METHOD_PREFIX = "get";

@@ -8,8 +8,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
-public @interface Definition {
-    String javaFileName() default "SharedPreferences";
-    String packageName() default "";
-    String spFileName() default "a_pref";
+public @interface AnnotationPrefs {
+    String javaFileName() default "SharedPreferencesUtil";
+    String prefsFileName() default "a_prefs";
 }

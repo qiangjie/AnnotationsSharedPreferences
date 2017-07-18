@@ -18,39 +18,39 @@ import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 
-/**
- * description:.
- *
- * @author：qiangjie @version：17/7/6 下午4:37
- */
 
-public class SharedPreferencesSet {
+public class PrefsSet {
+    public static final String INSTANCE_NAME = "mPreferences";
+
     private static final ClassName CONTEXT = ClassName.get("android.content", "Context");
     private static final ClassName SHAREDPREFERENCES = ClassName.get("android.content", "SharedPreferences");
+    private static final ClassName RUNTIME_EXCEPTION = ClassName.get("java.lang", "RuntimeException");
 
-    private TypeElement enclosingElement;
     private String javafileName;
     private String sharedPreferencesFileName;
     private String packageName;
     private List<BaseMethod> methodList;
 
-    public SharedPreferencesSet(TypeElement enclosingElement) {
-        this.enclosingElement = enclosingElement;
+    public PrefsSet() {
         this.methodList = new ArrayList<>();
     }
 
-    JavaFile brewJava(int sdk) {
-        return JavaFile.builder(packageName, createType(sdk)).addFileComment("Generated code from Butter Knife. Do not modify!").build();
+    JavaFile brewJava() {
+        return JavaFile.builder(packageName, createType()).addFileComment("Generated code from AptSharedPreferences. Do not modify!").build();
     }
 
-    private TypeSpec createType(int sdk) {
+    private TypeSpec createType() {
         TypeSpec.Builder result = TypeSpec.classBuilder(javafileName).addModifiers(PUBLIC);
 
-        FieldSpec instanceField = FieldSpec.builder(SHAREDPREFERENCES, "mMainSharedPreferences", Modifier.PRIVATE).build();
+        FieldSpec prefsField = FieldSpec.builder(SHAREDPREFERENCES, INSTANCE_NAME, Modifier.PRIVATE).build();
+        result.addField(prefsField);
+
+        FieldSpec instanceField = FieldSpec
+                .builder(ClassName.get(packageName, javafileName), "sInstance", Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE).build();
         result.addField(instanceField);
 
         result.addMethod(createConstructor());
-        result.addMethod(createNewInstanceMethod());
+        result.addMethod(createGetMethod());
         result.addMethod(createInitMethod());
 
         for (BaseMethod method : methodList) {
@@ -61,54 +61,46 @@ public class SharedPreferencesSet {
     }
 
     private MethodSpec createConstructor() {
-        MethodSpec.Builder builder = MethodSpec.constructorBuilder().addModifiers(PRIVATE);
+        MethodSpec.Builder builder = MethodSpec.constructorBuilder().addModifiers(PRIVATE)//
+                .addParameter(CONTEXT, "context")//
+                .addStatement("$L = context.getSharedPreferences($S,Context.MODE_PRIVATE)", INSTANCE_NAME,sharedPreferencesFileName);
+
         return builder.build();
     }
 
-    private MethodSpec createNewInstanceMethod() {
-        MethodSpec newInstanceMethd = MethodSpec.methodBuilder("newInstance")//
-                .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.SYNCHRONIZED)//
-                .returns(ClassName.get(packageName, javafileName))//
+    private MethodSpec createInitMethod() {
+        MethodSpec newInstanceMethd = MethodSpec.methodBuilder("init")//
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)//
+                .returns(TypeName.VOID)//
                 .addParameter(CONTEXT, "context")//
-                .addStatement(javafileName + " instance= new " + javafileName + "()")//
-                .addStatement("instance.init(context)")//
-                .addStatement("return instance")//
+                .addCode("if (sInstance == null) {\n")//
+                .addCode("     sInstance = new $T(context);\n", ClassName.get(packageName, javafileName))//
+                .addCode("}\n")//
                 .build();
         return newInstanceMethd;
     }
 
-    private MethodSpec createInitMethod() {
-        MethodSpec initMethd = MethodSpec.methodBuilder("init")//
-                .addModifiers(Modifier.PRIVATE)//
-                .returns(TypeName.VOID)//
-                .addParameter(CONTEXT, "context")//
-                .addStatement("mMainSharedPreferences = context.getSharedPreferences($S,Context.MODE_PRIVATE)", sharedPreferencesFileName)//
+    private MethodSpec createGetMethod() {
+        MethodSpec getMethd = MethodSpec.methodBuilder("get")//
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)//
+                .returns(ClassName.get(packageName, javafileName))//
+                .addCode("if (sInstance == null) { \n" + "      return sInstance; \n" + "} " + "else { \n")
+                .addStatement("     throw new $T($S)", RUNTIME_EXCEPTION, "the instance has not initialized")//
+                .addCode("} \n")//
                 .build();
-        return initMethd;
+        return getMethd;
     }
 
     public void addMethod(BaseMethod method) {
         methodList.add(method);
     }
 
-    public String getJavafileName() {
-        return javafileName;
-    }
-
     public void setJavafileName(String javafileName) {
         this.javafileName = javafileName;
     }
 
-    public String getSharedPreferencesFileName() {
-        return sharedPreferencesFileName;
-    }
-
     public void setSharedPreferencesFileName(String sharedPreferencesFileName) {
         this.sharedPreferencesFileName = sharedPreferencesFileName;
-    }
-
-    public String getPackageName() {
-        return packageName;
     }
 
     public void setPackageName(String packageName) {

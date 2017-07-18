@@ -11,29 +11,20 @@ import java.util.Set;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
-import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
-import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeName;
-import com.squareup.javapoet.TypeSpec;
 import com.yurnero.annotations.BooleanEntity;
-import com.yurnero.annotations.Definition;
+import com.yurnero.annotations.AnnotationPrefs;
 import com.yurnero.annotations.FloatEntity;
 import com.yurnero.annotations.IntEntity;
 import com.yurnero.annotations.LongEntity;
@@ -45,64 +36,43 @@ import com.yurnero.processor.method.SetterMethod;
 @AutoService(Processor.class)
 public class YurneroProcessor extends AbstractProcessor {
 
-    private Types typeUtils;
-    private Elements elementUtils;
     private Filer filer;
-    private Messager messager;
-    private static final String INSTANCE_NAME = "mMainSharedPreferences";
-    private static final ClassName CONTEXT = ClassName.get("android.content", "Context");
-    private static final ClassName SHAREDPREFERENCES = ClassName.get("android.content", "SharedPreferences");
-    private static final ClassName EDITOR = ClassName.get("android.content.SharedPreferences", "Editor");
+    private Elements elementUtils;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
 
-        typeUtils = processingEnv.getTypeUtils();
-        elementUtils = processingEnv.getElementUtils();
         filer = processingEnv.getFiler();
-        messager = processingEnv.getMessager();
+        elementUtils = processingEnv.getElementUtils();
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        Map<TypeElement, SharedPreferencesSet> bindingMap = findAndParseTargets(roundEnv);
+        Map<TypeElement, PrefsSet> bindingMap = findAndParseTargets(roundEnv);
 
-        for (Map.Entry<TypeElement, SharedPreferencesSet> entry : bindingMap.entrySet()) {
+        for (Map.Entry<TypeElement, PrefsSet> entry : bindingMap.entrySet()) {
             TypeElement typeElement = entry.getKey();
-            SharedPreferencesSet binding = entry.getValue();
+            PrefsSet binding = entry.getValue();
 
-            JavaFile javaFile = binding.brewJava(1);
+            JavaFile javaFile = binding.brewJava();
             try {
                 javaFile.writeTo(filer);
             } catch (IOException e) {
-                System.out.println(e.getMessage());
+                error(typeElement, "Unable to write file for type %s: %s", typeElement, e.getMessage());
             }
         }
-        // for (Element element : roundEnv.getElementsAnnotatedWith(Definition.class)) {
-        // System.out.println("------------------------------");
-        // // 判断元素的类型为Class
-        // if (element.getKind() == ElementKind.CLASS) {
-        // // 显示转换元素类型
-        // TypeElement typeElement = (TypeElement) element;
-        // // 输出元素名称
-        // System.out.println(typeElement.getSimpleName());
-        // // 输出注解属性值
-        // System.out.println(typeElement.getAnnotation(Definition.class).javaFileName());
-        // }
-        // System.out.println("------------------------------");
-        // }
         return false;
     }
 
-    private Map<TypeElement, SharedPreferencesSet> findAndParseTargets(RoundEnvironment env) {
-        Map<TypeElement, SharedPreferencesSet> builderMap = new LinkedHashMap<>();
+    private Map<TypeElement, PrefsSet> findAndParseTargets(RoundEnvironment env) {
+        Map<TypeElement, PrefsSet> builderMap = new LinkedHashMap<>();
 
-        for (Element element : env.getElementsAnnotatedWith(Definition.class)) {
+        for (Element element : env.getElementsAnnotatedWith(AnnotationPrefs.class)) {
             try {
-                paserDefinition(element, builderMap);
+                paserAnnotationPrefs(element, builderMap);
             } catch (Exception e) {
-                logParsingError(element, Definition.class, e);
+                logParsingError(element, AnnotationPrefs.class, e);
             }
         }
 
@@ -148,98 +118,98 @@ public class YurneroProcessor extends AbstractProcessor {
         return builderMap;
     }
 
-    private void paserDefinition(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void paserAnnotationPrefs(Element element, Map<TypeElement, PrefsSet> builderMap) {
         if (element.getKind() != ElementKind.CLASS) {
             return;
         }
         TypeElement typeElement = (TypeElement) element;
-        String fileName = typeElement.getAnnotation(Definition.class).javaFileName();
-        String spFileName = typeElement.getAnnotation(Definition.class).spFileName();
-        String packageName = typeElement.getAnnotation(Definition.class).packageName();
+        String fileName = typeElement.getAnnotation(AnnotationPrefs.class).javaFileName();
+        String spFileName = typeElement.getAnnotation(AnnotationPrefs.class).prefsFileName();
+        String packageName = elementUtils.getPackageOf(element).getQualifiedName().toString();;
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, typeElement);
-        sharedPreferencesSet.setJavafileName(fileName);
-        sharedPreferencesSet.setSharedPreferencesFileName(spFileName);
-        sharedPreferencesSet.setPackageName(packageName);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, typeElement);
+        prefsSet.setJavafileName(fileName);
+        prefsSet.setSharedPreferencesFileName(spFileName);
+        prefsSet.setPackageName(packageName);
     }
 
-    private void parseStringEntity(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void parseStringEntity(Element element, Map<TypeElement, PrefsSet> builderMap) {
         TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
 
         String key = element.getAnnotation(StringEntity.class).key();
         String defaultValue = element.getAnnotation(StringEntity.class).defaultValue();
 
-        GetterMethod getterMethod = new GetterMethod(StringEntity.class.getCanonicalName(), key, INSTANCE_NAME, defaultValue);
-        SetterMethod setterMethod = new SetterMethod(StringEntity.class.getCanonicalName(), key, INSTANCE_NAME);
+        GetterMethod getterMethod = new GetterMethod(StringEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME, defaultValue);
+        SetterMethod setterMethod = new SetterMethod(StringEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME);
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, enclosingElement);
-        sharedPreferencesSet.addMethod(getterMethod);
-        sharedPreferencesSet.addMethod(setterMethod);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, enclosingElement);
+        prefsSet.addMethod(getterMethod);
+        prefsSet.addMethod(setterMethod);
     }
 
-    private void parseBooleanEntity(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void parseBooleanEntity(Element element, Map<TypeElement, PrefsSet> builderMap) {
         TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
 
         String key = element.getAnnotation(BooleanEntity.class).key();
         boolean defaultValue = element.getAnnotation(BooleanEntity.class).defaultValue();
 
-        GetterMethod getterMethod = new GetterMethod(BooleanEntity.class.getCanonicalName(), key, INSTANCE_NAME, String.valueOf(defaultValue));
-        SetterMethod setterMethod = new SetterMethod(BooleanEntity.class.getCanonicalName(), key, INSTANCE_NAME);
+        GetterMethod getterMethod = new GetterMethod(BooleanEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME, String.valueOf(defaultValue));
+        SetterMethod setterMethod = new SetterMethod(BooleanEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME);
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, enclosingElement);
-        sharedPreferencesSet.addMethod(getterMethod);
-        sharedPreferencesSet.addMethod(setterMethod);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, enclosingElement);
+        prefsSet.addMethod(getterMethod);
+        prefsSet.addMethod(setterMethod);
     }
 
-    private void parseFloatEntity(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void parseFloatEntity(Element element, Map<TypeElement, PrefsSet> builderMap) {
         TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
 
         String key = element.getAnnotation(FloatEntity.class).key();
         float defaultValue = element.getAnnotation(FloatEntity.class).defaultValue();
 
-        GetterMethod getterMethod = new GetterMethod(FloatEntity.class.getCanonicalName(), key, INSTANCE_NAME, String.valueOf(defaultValue));
-        SetterMethod setterMethod = new SetterMethod(FloatEntity.class.getCanonicalName(), key, INSTANCE_NAME);
+        GetterMethod getterMethod = new GetterMethod(FloatEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME, String.valueOf(defaultValue));
+        SetterMethod setterMethod = new SetterMethod(FloatEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME);
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, enclosingElement);
-        sharedPreferencesSet.addMethod(getterMethod);
-        sharedPreferencesSet.addMethod(setterMethod);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, enclosingElement);
+        prefsSet.addMethod(getterMethod);
+        prefsSet.addMethod(setterMethod);
     }
 
-    private void parseIntEntity(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void parseIntEntity(Element element, Map<TypeElement, PrefsSet> builderMap) {
         TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
 
         String key = element.getAnnotation(IntEntity.class).key();
         int defaultValue = element.getAnnotation(IntEntity.class).defaultValue();
 
-        GetterMethod getterMethod = new GetterMethod(IntEntity.class.getCanonicalName(), key, INSTANCE_NAME, String.valueOf(defaultValue));
-        SetterMethod setterMethod = new SetterMethod(IntEntity.class.getCanonicalName(), key, INSTANCE_NAME);
+        GetterMethod getterMethod = new GetterMethod(IntEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME, String.valueOf(defaultValue));
+        SetterMethod setterMethod = new SetterMethod(IntEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME);
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, enclosingElement);
-        sharedPreferencesSet.addMethod(getterMethod);
-        sharedPreferencesSet.addMethod(setterMethod);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, enclosingElement);
+        prefsSet.addMethod(getterMethod);
+        prefsSet.addMethod(setterMethod);
     }
 
-    private void parseLongEntity(Element element, Map<TypeElement, SharedPreferencesSet> builderMap) {
+    private void parseLongEntity(Element element, Map<TypeElement, PrefsSet> builderMap) {
         TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
 
         String key = element.getAnnotation(LongEntity.class).key();
         long defaultValue = element.getAnnotation(LongEntity.class).defaultValue();
 
-        GetterMethod getterMethod = new GetterMethod(LongEntity.class.getCanonicalName(), key, INSTANCE_NAME, String.valueOf(defaultValue));
-        SetterMethod setterMethod = new SetterMethod(LongEntity.class.getCanonicalName(), key, INSTANCE_NAME);
+        GetterMethod getterMethod = new GetterMethod(LongEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME, String.valueOf(defaultValue));
+        SetterMethod setterMethod = new SetterMethod(LongEntity.class.getCanonicalName(), key, PrefsSet.INSTANCE_NAME);
 
-        SharedPreferencesSet sharedPreferencesSet = getOrCreateSet(builderMap, enclosingElement);
-        sharedPreferencesSet.addMethod(getterMethod);
-        sharedPreferencesSet.addMethod(setterMethod);
+        PrefsSet prefsSet = getOrCreateSet(builderMap, enclosingElement);
+        prefsSet.addMethod(getterMethod);
+        prefsSet.addMethod(setterMethod);
     }
 
-    private SharedPreferencesSet getOrCreateSet(Map<TypeElement, SharedPreferencesSet> builderMap, TypeElement enclosingElement) {
-        SharedPreferencesSet sharedPreferencesSet = builderMap.get(enclosingElement);
-        if (sharedPreferencesSet == null) {
-            sharedPreferencesSet = new SharedPreferencesSet(enclosingElement);
-            builderMap.put(enclosingElement, sharedPreferencesSet);
+    private PrefsSet getOrCreateSet(Map<TypeElement, PrefsSet> builderMap, TypeElement enclosingElement) {
+        PrefsSet prefsSet = builderMap.get(enclosingElement);
+        if (prefsSet == null) {
+            prefsSet = new PrefsSet();
+            builderMap.put(enclosingElement, prefsSet);
         }
-        return sharedPreferencesSet;
+        return prefsSet;
     }
 
     private void logParsingError(Element element, Class<? extends Annotation> annotation, Exception e) {
@@ -250,10 +220,6 @@ public class YurneroProcessor extends AbstractProcessor {
 
     private void error(Element element, String message, Object... args) {
         printMessage(Diagnostic.Kind.ERROR, element, message, args);
-    }
-
-    private void note(Element element, String message, Object... args) {
-        printMessage(Diagnostic.Kind.NOTE, element, message, args);
     }
 
     private void printMessage(Diagnostic.Kind kind, Element element, String message, Object[] args) {
@@ -267,7 +233,7 @@ public class YurneroProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         Set<String> annotataions = new LinkedHashSet<>();
-        annotataions.add(Definition.class.getCanonicalName());
+        annotataions.add(AnnotationPrefs.class.getCanonicalName());
         annotataions.add(BooleanEntity.class.getCanonicalName());
         annotataions.add(FloatEntity.class.getCanonicalName());
         annotataions.add(IntEntity.class.getCanonicalName());

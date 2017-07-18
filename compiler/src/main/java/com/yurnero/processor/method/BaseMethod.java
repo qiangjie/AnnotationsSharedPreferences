@@ -2,11 +2,7 @@ package com.yurnero.processor.method;
 
 import com.squareup.javapoet.MethodSpec;
 
-/**
- * description:.
- *
- * @author：qiangjie @version：17/7/9 下午11:17
- */
+
 
 public abstract class BaseMethod {
     protected String key;
