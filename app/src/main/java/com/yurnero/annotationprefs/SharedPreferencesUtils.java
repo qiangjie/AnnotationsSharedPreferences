@@ -14,18 +14,18 @@ import com.yurnero.annotations.StringEntity;
  */
 @AnnotationPrefs(javaFileName = "MySharedPreferences", prefsFileName = "mysp")
 public class SharedPreferencesUtils {
-    @StringEntity(key = "key_name", defaultValue = "hah")
-    String KEY_NAME;
+    @StringEntity(key = "name", defaultValue = "hah")
+    String NAME;
 
-    @BooleanEntity(key = "key_is_chinese", defaultValue = true)
-    String KEY_IS_CHINESE;
+    @BooleanEntity(key = "is_chinese", defaultValue = true)
+    boolean IS_CHINESE;
 
-    @IntEntity(key = "key_age", defaultValue = 16)
-    String KEY_AGE;
+    @IntEntity(key = "age", defaultValue = 16)
+    int KEY_AGE;
 
-    @FloatEntity(key = "key_hight", defaultValue = 16.6f)
-    String KEY_HEIGHT;
+    @FloatEntity(key = "hight", defaultValue = 16.6f)
+    float KEY_HEIGHT;
 
-    @LongEntity(key = "key_number", defaultValue = 188L)
-    String KEY_NUMBER;
+    @LongEntity(key = "number", defaultValue = 188L)
+    long KEY_NUMBER;
 }
