@@ -12,7 +12,7 @@ import com.yurnero.annotations.StringEntity;
  *
  * @author：qiangjie @version：17/7/4 上午12:17
  */
-@AnnotationPrefs(javaFileName = "MySharedPreferences1")
+@AnnotationPrefs(javaFileName = "MySharedPreferences1",prefsFileName = "mysp1")
 public class SharedPreferencesUtils1 {
     @StringEntity(key = "key_name", defaultValue = "hah")
     String KEY_NAME;

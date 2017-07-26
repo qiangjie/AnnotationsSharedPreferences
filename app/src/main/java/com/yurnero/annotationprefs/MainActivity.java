@@ -11,8 +11,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        MySharedPreferences.get().getKeyAge();
+        MySharedPreferences.get().setAge(19);
 
-        MySharedPreferences.get().setKeyAge(19);
+        MySharedPreferences.get().getAge();
     }
 }

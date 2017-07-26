@@ -32,8 +32,8 @@ public class SharedPreferencesUtils {
 
 ```
 dependencies {
-    compile 'com.github.qiangjie:aptsharedpreferences-annotations:1.0.2'
-    annotationProcessor 'com.github.qiangjie:aptsharedpreferences-compiler:1.0.2'
+    compile 'com.github.qiangjie:aptsharedpreferences-annotations:1.0.3'
+    annotationProcessor 'com.github.qiangjie:aptsharedpreferences-compiler:1.0.3'
 
 }
 ```
@@ -45,9 +45,10 @@ dependencies {
 
 读取和设置方法如下：
  
-
-    MySharedPreferences.get().getKeyAge();
-    MySharedPreferences.get().setKeyAge(19);
+    MySharedPreferences.get().setAge(19);
+    
+    MySharedPreferences.get().getAge();
+    
     
 
 ## 项目地址
